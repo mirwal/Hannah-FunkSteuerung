@@ -1,0 +1,44 @@
+FunkSteuerung       → Paket aufbauen und senden
+█Encoder             → Drehbewegung und Winkel erfassen
+█Controls            → Joysticks, Poti, Fader, Taster lesen
+█BatteryMonitor      → Akkuspannung und Warnzustand
+█InactivityWarning   → Inaktivität erkennen und Vibration auslösen
+Display             → OLED-Oberfläche zeichnen
+
+
+
+Hauptmenü
+├── Kalibrierung
+│   ├── Linker Joystick
+│   │   ├── Mittelstellung speichern
+│   │   ├── Min/Max kalibrieren
+│   │   └── Totzone
+│   ├── Rechter Joystick
+│   ├── Poti
+│   └── Fader
+│
+├── Anzeige
+│   ├── Helligkeit
+│   ├── Displayseite beim Start
+│   └── Display ausschalten nach ...
+│
+├── Funk
+│   ├── Sendestatus
+│   ├── Paket-Zähler
+│   └── Testpaket senden
+│
+├── Akku
+│   ├── aktuelle Spannung
+│   ├── Warnschwelle
+│   └── Warnung testen
+│
+├── Diagnose
+│   ├── Analogwerte A0–A5
+│   ├── Tasterzustände
+│   ├── Encoder-Test
+│   └── Schleifen-/Sendezeit
+│
+└── Einstellungen
+    ├── Vibration testen
+    ├── Werkseinstellungen
+    └── Über die Steuerung
