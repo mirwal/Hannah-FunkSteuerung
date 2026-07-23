@@ -1,18 +1,19 @@
 // Menu.cpp
 #include "Menu.h"
 
-void Menu::update(const SenderControlEvents &events)
+void Menu::update(
+    const SenderControlEvents &events,
+    const FunkSteuerungData &funkData,
+    const TimingData &timingData)
 {
-
-    // Handle input events based on the current page
     switch (currentPage)
     {
     case MenuPage::MAIN:
-        handleMainMenu(events, 3);
+        handleMenu(events, 3);
         break;
 
     case MenuPage::DIAGNOSTICS:
-        handleDiagnosticsMenu(events, 4);
+        handleMenu(events, 4);
         break;
 
     case MenuPage::DIAGNOSTICS_ANALOG:
@@ -21,20 +22,41 @@ void Menu::update(const SenderControlEvents &events)
     case MenuPage::DIAGNOSTICS_TIMING:
     case MenuPage::CALIBRATION:
     case MenuPage::BATTERY:
-        handleSubmenu(events);
         break;
     }
 
+    // Dynamische Diagnoseseiten alle 100 ms neu zeichnen
+    if (currentPage == MenuPage::DIAGNOSTICS_ANALOG || currentPage == MenuPage::DIAGNOSTICS_BUTTONS || currentPage == MenuPage::DIAGNOSTICS_RADIO ||
+        currentPage == MenuPage::DIAGNOSTICS_TIMING)
+    {
+        const uint32_t currentTime = millis();
+
+        if (currentTime - lastDiagnosticsRefresh >= DIAGNOSTICS_REFRESH_MS)
+        {
+            lastDiagnosticsRefresh = currentTime;
+            redrawRequired = true;
+        }
+    }
+
+    // if (events.clearPressed)
+    // {
+    //     Serial.println("Clear pressed, going back to main menu");
+    //     // redrawRequired = true;
+    // }
+
     if (redrawRequired)
     {
-        draw();
+        draw(funkData, timingData);
         redrawRequired = false;
+    }
+    if (events.backPressed)
+    {
+        goBack();
     }
 }
 
-void Menu::handleMainMenu(const SenderControlEvents &events, uint8_t numEntries)
+void Menu::handleMenu(const SenderControlEvents &events, uint8_t numEntries)
 {
-
     if (events.encoderDirection != 0)
     {
         moveSelection(events.encoderDirection, numEntries);
@@ -46,73 +68,6 @@ void Menu::handleMainMenu(const SenderControlEvents &events, uint8_t numEntries)
         selectEntry();
         redrawRequired = true;
     }
-}
-
-void Menu::handleSubmenu(const SenderControlEvents &events)
-{
-    if (events.backPressed)
-    {
-        goBack();
-    }
-}
-// DIAGNOSTICS
-void Menu::handleDiagnosticsMenu(const SenderControlEvents &events, uint8_t numEntries)
-{
-    if (events.encoderDirection != 0)
-    {
-        moveSelection(events.encoderDirection, numEntries);
-        redrawRequired = true;
-    }
-
-    if (events.encoderPressed)
-    {
-        selectDiagnosticsEntry();
-        // redrawRequired = true;
-    }
-
-    if (events.backPressed)
-    {
-        goBack();
-    }
-}
-
-void Menu::selectDiagnosticsEntry()
-{
-    switch (selectedEntry)
-    {
-    case 0:
-        currentPage = MenuPage::DIAGNOSTICS_ANALOG;
-        break;
-    case 1:
-        currentPage = MenuPage::DIAGNOSTICS_BUTTONS;
-        break;
-    case 2:
-        currentPage = MenuPage::DIAGNOSTICS_RADIO;
-        break;
-    case 3:
-        currentPage = MenuPage::DIAGNOSTICS_TIMING;
-        break;
-    default:
-        break;
-    }
-    selectedEntry = 0;
-    redrawRequired = true;
-}
-
-void Menu::drawDiagnosticsMenu() const
-{
-    Serial.println("== Diagnose ==");
-    Serial.println();
-    selectedEntry == 0 ? Serial.print(">") : Serial.print(" ");
-    Serial.println(" 1. Analogwerte");
-    selectedEntry == 1 ? Serial.print(">") : Serial.print(" ");
-    Serial.println(" 2. Tasterzustände");
-    selectedEntry == 2 ? Serial.print(">") : Serial.print(" ");
-    Serial.println(" 3. Funkstatus");
-    selectedEntry == 3 ? Serial.print(">") : Serial.print(" ");
-    Serial.println(" 4. Zeitmessung");
-    Serial.println();
-    Serial.println("Back: Hauptmenü");
 }
 
 void Menu::moveSelection(int8_t direction, uint8_t numEntries)
@@ -146,10 +101,34 @@ void Menu::selectEntry()
             currentPage = MenuPage::BATTERY;
             Serial.println("Battery selected");
             break;
+        default:
+            break;
         }
         break;
-
     case MenuPage::DIAGNOSTICS:
+        switch (selectedEntry)
+        {
+        case 0:
+            Serial.println("Diagnostics Analog selected");
+            currentPage = MenuPage::DIAGNOSTICS_ANALOG;
+            break;
+
+        case 1:
+            Serial.println("Diagnostics Buttons selected");
+            currentPage = MenuPage::DIAGNOSTICS_BUTTONS;
+            break;
+
+        case 2:
+            Serial.println("Diagnostics Radio selected");
+            currentPage = MenuPage::DIAGNOSTICS_RADIO;
+            break;
+
+        case 3:
+            Serial.println("Diagnostics Timing selected");
+            currentPage = MenuPage::DIAGNOSTICS_TIMING;
+            break;
+        }
+        break;
     case MenuPage::CALIBRATION:
     case MenuPage::BATTERY:
         break;
@@ -183,85 +162,32 @@ void Menu::goBack()
     redrawRequired = true;
 }
 
-void Menu::draw()
-{
-    Serial.println();
-    Serial.println("--------------------");
-    switch (currentPage)
-    {
-    case MenuPage::MAIN:
-        drawMainMenu();
-        break;
-
-    case MenuPage::DIAGNOSTICS:
-        drawDiagnosticsMenu();
-        break;
-    case MenuPage::DIAGNOSTICS_ANALOG:
-    case MenuPage::DIAGNOSTICS_BUTTONS:
-    case MenuPage::DIAGNOSTICS_RADIO:
-    case MenuPage::DIAGNOSTICS_TIMING:
-    case MenuPage::CALIBRATION:
-    case MenuPage::BATTERY:
-        drawCurrentPage();
-        break;
-    }
-}
-
-void Menu::drawMainMenu() const
-{
-
-    Serial.println("== Hauptmenü ==");
-    Serial.println("");
-    selectedEntry == 0 ? Serial.print(">") : Serial.print(" ");
-    Serial.println(" 1. Diagnose");
-    selectedEntry == 1 ? Serial.print(">") : Serial.print(" ");
-    Serial.println(" 2. Kalibrierung");
-    selectedEntry == 2 ? Serial.print(">") : Serial.print(" ");
-    Serial.println(" 3. Batterie");
-}
-
-//! ###############################################################################################
-void Menu::drawCurrentPage() const
+void Menu::draw(const FunkSteuerungData &funkData, const TimingData &timingData)
 {
     switch (currentPage)
     {
-    case MenuPage::DIAGNOSTICS_ANALOG:
-        Serial.println("== Analogwerte ==");
-        Serial.println();
-        Serial.println("Analogwerte kommen später");
-        break;
-
-    case MenuPage::DIAGNOSTICS_BUTTONS:
-        Serial.println("== Tasterzustände ==");
-        Serial.println();
-        Serial.println("Tasterzustände kommen später");
-        break;
-
-    case MenuPage::DIAGNOSTICS_RADIO:
-        Serial.println("== Funkstatus ==");
-        Serial.println();
-        Serial.println("Funkstatus kommt später");
-        break;
-
-    case MenuPage::DIAGNOSTICS_TIMING:
-        Serial.println("== Zeitmessung ==");
-        Serial.println();
-        Serial.println("Zeitmessung kommt später");
-        break;
-
-    case MenuPage::CALIBRATION:
-        Serial.println("== Kalibrierung ==");
-        break;
-
-    case MenuPage::BATTERY:
-        Serial.println("== Batterie ==");
-        break;
-
     case MenuPage::MAIN:
+        display.drawMainMenu(selectedEntry);
+        break;
+
     case MenuPage::DIAGNOSTICS:
+        display.drawDiagnosticsMenu(selectedEntry);
+        break;
+    case MenuPage::DIAGNOSTICS_ANALOG:
+
+        display.drawAnalogValues(funkData);
+        break;
+    case MenuPage::DIAGNOSTICS_BUTTONS:
+        display.drawButtonStates(funkData);
+        break;
+    case MenuPage::DIAGNOSTICS_RADIO:
+        display.drawRadioValues(funkData);
+        break;
+    case MenuPage::DIAGNOSTICS_TIMING:
+        display.drawTimingValues(funkData, timingData);
+        break;
+    case MenuPage::CALIBRATION:
+    case MenuPage::BATTERY:
         break;
     }
-
-    Serial.println();
-    Serial.println("Back: zurück");
 }

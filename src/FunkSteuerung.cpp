@@ -71,12 +71,32 @@ bool FunkSteuerung::update()
 
     if (currentTime - lastSendTime >= SEND_INTERVAL_MS)
     {
-        lastSendTime = currentTime;
-
         funkeAuswerten();
+        updatePaketRate();
         result = sendePaket();
+        data.lastPaketSentTime = currentTime - lastSendTime;
+        data.paketePerSecond = paketePerSecond;
+        lastSendTime = currentTime;
     }
     return result;
+}
+
+void FunkSteuerung::updatePaketRate()
+{
+    const uint32_t currentTime = millis();
+    const uint32_t elapsedTime = currentTime - lastRateMeasureTime;
+
+    if (elapsedTime >= 1000)
+    {
+        const uint32_t sentPakets =
+            sentPaketCount - lastPaketCount;
+
+        paketePerSecond =
+            static_cast<uint16_t>((sentPakets * 1000UL) / elapsedTime);
+
+        lastPaketCount = sentPaketCount;
+        lastRateMeasureTime = currentTime;
+    }
 }
 
 void FunkSteuerung::funkeAuswerten()
@@ -92,6 +112,17 @@ void FunkSteuerung::funkeAuswerten()
     data.schalter = buildButtonMask();
     data.taster = readTasterDebouncedAndBuildMask();
     data.sonderTaste = readSonderTasterDebouncedAndBuildMask();
+
+    uint8_t mask = data.schalter;
+    data.hr1 = bitRead(mask, 0);
+    data.hr2 = bitRead(mask, 1);
+    data.hr3 = bitRead(mask, 2);
+    data.hl1 = bitRead(mask, 3);
+    data.hl2 = bitRead(mask, 4);
+    data.hl3 = bitRead(mask, 5);
+
+    data.trainer = !bitRead(data.sonderTaste, 0);
+    data.sentPaketCount = sentPaketCount;
 }
 
 uint8_t FunkSteuerung::calculateChecksum(const uint8_t *data, size_t length)
@@ -108,43 +139,62 @@ uint8_t FunkSteuerung::calculateChecksum(const uint8_t *data, size_t length)
 
 bool FunkSteuerung::sendePaket()
 {
-    uint8_t packet[20] = {0};
-    packet[0] = 0xF1; // Startbyte
-    packet[1] = 0x7E; // Startbyte
+    uint8_t Paket[20] = {0};
+    Paket[0] = 0xF1; // Startbyte
+    Paket[1] = 0x7E; // Startbyte
 
-    writeU16(packet, 2, data.hl_ud);
-    writeU16(packet, 4, data.hl_lr);
-    writeU16(packet, 6, data.hr_ud);
-    writeU16(packet, 8, data.hr_lr);
-    writeU16(packet, 10, data.poti);
-    writeU16(packet, 12, data.flap);
-    writeU16(packet, 14, data.fader);
+    writeU16(Paket, 2, data.hl_ud);
+    writeU16(Paket, 4, data.hl_lr);
+    writeU16(Paket, 6, data.hr_ud);
+    writeU16(Paket, 8, data.hr_lr);
+    writeU16(Paket, 10, data.poti);
+    writeU16(Paket, 12, data.flap);
+    writeU16(Paket, 14, data.fader);
 
-    packet[16] = data.schalter;
-    packet[17] = data.taster;
-    packet[18] = data.sonderTaste; // Sondertaste, falls benötigt
+    Paket[16] = data.schalter;
+    Paket[17] = data.taster;
+    Paket[18] = data.sonderTaste; // Sondertaste, falls benötigt
 
-    packet[19] = calculateChecksum(packet, 19);
+    Paket[19] = calculateChecksum(Paket, 19);
 
-    port.write(packet, sizeof(packet));
+    const uint32_t currentTime = micros();
+    if (lastPaketTime != 0)
+    {
+        paketInterval = currentTime - lastPaketTime;
+
+        if (paketInterval > maxPaketInterval)
+        {
+            maxPaketInterval = paketInterval;
+        }
+    }
+
+    lastPaketTime = currentTime;
+
+    port.write(Paket, sizeof(Paket));
+
+    sentPaketCount++;
+    data.paketInterval = paketInterval;
+    data.maxPaketInterval = maxPaketInterval;
+    data.sentPaketCount = sentPaketCount;
 
     //! für dwbug hillfen ########################################
     // if (digitalRead(PIN_T_ENCODER))
     // {
 
     //     Serial.print("Sende Paket: ");
-    //     for (size_t i = 0; i < sizeof(packet); i++)
+    //     for (size_t i = 0; i < sizeof(Paket); i++)
     //     {
-    //         Serial.print(packet[i], HEX);
+    //         Serial.print(Paket[i], HEX);
     //         Serial.print(" ");
     //     }
     //     Serial.println();
     // }
-    // return true;
+    return true;
 }
 
 bool FunkSteuerung::isChecksumValid(const uint8_t *data, size_t length)
 {
+    //
     if (length < 1)
     {
         return false; // Not enough data to validate checksum
@@ -254,6 +304,7 @@ uint8_t FunkSteuerung::buildButtonMask()
     // }
     // Serial.print("\t ");
     // Serial.println(mask, HEX);
+
     maskData.schalterMask = mask;
     return mask;
 }

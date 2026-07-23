@@ -8,9 +8,14 @@ void SenderControls::begin()
     pinMode(clearButtonPin, INPUT_PULLUP);
 
     lastEncoderPosition = encoder.getPosition();
-    lastEncoderButtonState = false; // Gehen Sie davon aus, dass beim Start keine Tasten gedrückt sind.
+    lastEncoderButtonState = digitalRead(encoderButtonPin) == LOW; // Gehen Sie davon aus, dass beim Start keine Tasten gedrückt sind.
     lastBackButtonState = digitalRead(backButtonPin) == LOW;
     lastClearButtonState = digitalRead(clearButtonPin) == LOW;
+
+    events.encoderDirection = 0;
+    events.encoderPressed = false;
+    events.backPressed = false;
+    events.clearPressed = false;
 }
 void SenderControls::update()
 {

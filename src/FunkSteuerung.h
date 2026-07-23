@@ -29,7 +29,7 @@ struct FunkSteuerungData
     uint16_t fader = 0;
 
     // Schalter / Sonderfunktionen
-    uint8_t flap = 0;
+    uint16_t flap = 0;
 
     // Kompakte Bitmaske für Übertragung
     uint8_t schalter = 0;
@@ -55,6 +55,13 @@ struct FunkSteuerungData
     bool taster6 = false;
     bool taster7 = false;
     bool taster8 = false;
+
+    uint32_t lastPaketSentTime = 0;
+    uint32_t sentPaketCount = 0;
+    uint16_t paketePerSecond = 0;
+
+    uint32_t paketInterval = 0;
+    uint32_t maxPaketInterval = 0;
 };
 
 class FunkSteuerung
@@ -65,10 +72,10 @@ public:
     bool update();
     void getSchalterMask(uint8_t &mask) { mask = maskData.schalterMask; }
     void getTasterMask(uint8_t &mask) { mask = maskData.tasterMask; }
-
+    const FunkSteuerungData &getData() const { return data; }
+    void resetMaxPacketInterval() { maxPaketInterval = paketInterval; }
     //! test
-    void getSonderTasterMask(uint8_t &mask) { mask = maskData.sonderTasterMask; }
-    void getFunkSteuerungData(FunkSteuerungData &outData) { outData = data; }
+    // void getSonderTasterMask(uint8_t &mask) { mask = maskData.sonderTasterMask; }
     void getMaskData(MaskData &outMaskData) { outMaskData = maskData; }
 
 private:
@@ -77,7 +84,21 @@ private:
     MaskData maskData;
 
     static constexpr uint32_t SEND_INTERVAL_MS = 20;
+
     uint32_t lastSendTime = 0;
+
+    uint32_t lastMeasureTime = 0;
+
+    uint32_t sentPaketCount = 0;
+    uint32_t lastPaketCount = 0;
+    uint32_t lastRateMeasureTime = 0;
+    uint16_t paketePerSecond = 0;
+
+    uint32_t lastPaketTime = 0;
+    uint32_t paketInterval = 0;
+    uint32_t maxPaketInterval = 0;
+
+    void updatePaketRate();
 
     void funkeAuswerten();
     bool sendePaket();
