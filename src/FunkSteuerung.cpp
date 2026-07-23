@@ -129,18 +129,18 @@ bool FunkSteuerung::sendePaket()
     port.write(packet, sizeof(packet));
 
     //! für dwbug hillfen ########################################
-    if (digitalRead(PIN_T_ENCODER))
-    {
+    // if (digitalRead(PIN_T_ENCODER))
+    // {
 
-        Serial.print("Sende Paket: ");
-        for (size_t i = 0; i < sizeof(packet); i++)
-        {
-            Serial.print(packet[i], HEX);
-            Serial.print(" ");
-        }
-        Serial.println();
-    }
-    return true;
+    //     Serial.print("Sende Paket: ");
+    //     for (size_t i = 0; i < sizeof(packet); i++)
+    //     {
+    //         Serial.print(packet[i], HEX);
+    //         Serial.print(" ");
+    //     }
+    //     Serial.println();
+    // }
+    // return true;
 }
 
 bool FunkSteuerung::isChecksumValid(const uint8_t *data, size_t length)

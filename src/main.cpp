@@ -119,8 +119,8 @@ void setup()
   batteryMonitor.begin();
   funkSteuerung.begin(115200);
   menu.begin();
-
   senderControls.begin();
+
   Serial.println("FunkSteuerung Startet...");
 
   pinMode(36, OUTPUT);    // encoder VCC
@@ -132,7 +132,6 @@ void setup()
   lastAnalogValues[3] = analogRead(A3);
 
   initializeDisplay();
-  delay(4000);
 }
 
 //! ###############################################################################################
@@ -174,10 +173,10 @@ void printDisplays()
       displays_MaskData = newDisplays_MaskData;
     }
 
-    uint16_t y1 = map(analogRead(A0), 0, 1023, -200, 200);
-    uint16_t x1 = map(analogRead(A1), 0, 1023, 200, -200);
-    uint16_t y2 = map(analogRead(A2) + 24, 0, 1023, -200, 200);
-    uint16_t x2 = map(analogRead(A3) - 2, 0, 1023, -200, 200);
+    // uint16_t y1 = map(analogRead(A0), 0, 1023, -200, 200);
+    // uint16_t x1 = map(analogRead(A1), 0, 1023, 200, -200);
+    // uint16_t y2 = map(analogRead(A2) + 24, 0, 1023, -200, 200);
+    // uint16_t x2 = map(analogRead(A3) - 2, 0, 1023, -200, 200);
 
     if (analog6 < 1000) ///! nur mit debnug schalter stellung
     {
@@ -225,8 +224,6 @@ void loop()
   }
   const uint32_t loopStart = micros();
   static unsigned long lastPrintTime_ms = 0, countDatenGesamt = 0;
-
-  menu.update(senderControls.getEvents());
 
   if (funkSteuerung.update()) // die Funksteuerung hat neue Daten empfangen, dann erst weiter dann darf der restliche Code ausgeführt werden
   {
@@ -329,7 +326,6 @@ bool initializeDisplay()
   display.drawUTF8(i += j, 38, SymbolIchon.zuruck);        // Print the back symbol
   display.drawUTF8(i += j, 38, SymbolIchon.online);        // Print the online symbol
   display.setFont(Font_6x12);
-
   display.sendBuffer();
   return true;
 }
