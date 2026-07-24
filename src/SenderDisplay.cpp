@@ -248,7 +248,60 @@ void SenderDisplay::drawButtonStates(const FunkSteuerungData &data)
 
     show();
 }
+void SenderDisplay::drawCalibrationMenu(uint8_t selectedEntry)
+{
+    clear();
+    drawTitle("Kalibrierung");
+    drawMenuEntry(0, "Kalibrierung Center", selectedEntry == 0);
+    drawMenuEntry(1, "Kalibrierung Min/Max", selectedEntry == 1);
+    show();
+}
+
+void SenderDisplay::drawCalibrationCenter(const FunkSteuerungData &data)
+{
+    clear();
+    drawTitle("Kalibrierung Center");
+    display.setFont(Font_Entry);
+    display.setCursor(2, 18);
+    display.print("Joysticks loslassen");
+
+    display.setCursor(2, 29);
+    display.print("HL   ");
+    display.print(data.hl_lr);
+    display.print(" / ");
+    display.print(data.hl_ud);
+
+    display.setCursor(2, 40);
+    display.print("HR   ");
+    display.print(data.hr_lr);
+    display.print(" / ");
+    display.print(data.hr_ud);
+    display.setCursor(2, 51);
+    display.print("Clear = übernehmen");
+
+    show();
+}
+
+void SenderDisplay::drawCalibrationMinMax(const FunkSteuerungData &data)
+{
+    clear();
+    drawTitle("Kalibrierung Min/Max");
+    show();
+}
 
 void SenderDisplay::drawBattery(uint16_t millivolts)
 {
+}
+
+void SenderDisplay::drawSaveConfirmation(const char *message)
+{
+    display.setDrawColor(0);
+    display.drawFrame(20, 20, 128 - 20, 64 - 20);
+    display.setDrawColor(1);
+    display.drawBox(20, 20, 128 - 20, 64 - 20);
+    drawTitle("Gespeichert");
+    display.setFont(Font_Entry);
+    display.setCursor(2, 29);
+    display.print(message);
+    show();
 }

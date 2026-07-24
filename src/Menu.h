@@ -22,14 +22,18 @@ enum class MenuPage : uint8_t
     DIAGNOSTICS_RADIO,
     DIAGNOSTICS_TIMING,
     CALIBRATION,
+    CALIBRATION_CENTER,
+    CALIBRATION_MIN_MAX,
+
     BATTERY
 };
 
 class Menu
 {
 public:
-    explicit Menu(SenderDisplay &display)
-        : display(display)
+    explicit Menu(SenderDisplay &display, FunkSteuerung &funkSteuerung)
+        : display(display),
+          funkSteuerung(funkSteuerung)
     {
     }
     void begin() {};
@@ -40,6 +44,7 @@ public:
 
 private:
     SenderDisplay &display;
+    FunkSteuerung &funkSteuerung;
 
     MenuPage currentPage = MenuPage::MAIN;
     uint8_t selectedEntry = 0;
@@ -47,6 +52,10 @@ private:
     static constexpr uint32_t DIAGNOSTICS_REFRESH_MS = 100;
     uint32_t lastDiagnosticsRefresh = 0;
     bool redrawRequired = true;
+
+    static constexpr uint32_t SAVE_MESSAGE_DURATION_MS = 1000;
+    bool showSaveMessage = false;
+    uint32_t saveMessageStart = 0;
 
     void handleMenu(const SenderControlEvents &events, uint8_t numEntries);
 

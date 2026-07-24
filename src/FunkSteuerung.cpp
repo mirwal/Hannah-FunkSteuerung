@@ -9,7 +9,7 @@ FunkSteuerung::FunkSteuerung(HardwareSerial &serial)
 void FunkSteuerung::begin(uint32_t baudrate)
 {
     port.begin(baudrate);
-
+    loadCalibration();
     for (uint8_t i = 0; i < TASTER_COUNT; i++)
     {
         pinMode(tasterPins[i], INPUT_PULLUP);
@@ -80,6 +80,82 @@ bool FunkSteuerung::update()
     }
     return result;
 }
+void FunkSteuerung::saveCalibration()
+{
+    JoystickCalibration storedCalibration;
+
+    storedCalibration.magicNumber = CALIBRATION_MAGIC_NUMBER;
+
+    storedCalibration.hlUd = calibrationHlUd;
+    storedCalibration.hlLr = calibrationHlLr;
+    storedCalibration.hrUd = calibrationHrUd;
+    storedCalibration.hrLr = calibrationHrLr;
+
+    EEPROM.put(EEPROM_CALIBRATION_ADDRESS, storedCalibration);
+
+    Serial.println("Joystick-Kalibrierung im EEPROM gespeichert");
+}
+bool FunkSteuerung::isCalibrationValid(
+    const AxisCalibration &calibration) const
+{
+    return calibration.minValue < calibration.center &&
+           calibration.center < calibration.maxValue &&
+           calibration.maxValue <= 1023;
+}
+
+void FunkSteuerung::loadCalibration()
+{
+    JoystickCalibration storedCalibration;
+
+    EEPROM.get(
+        EEPROM_CALIBRATION_ADDRESS,
+        storedCalibration);
+
+    const bool valid =
+        storedCalibration.magicNumber == CALIBRATION_MAGIC_NUMBER &&
+        isCalibrationValid(storedCalibration.hlUd) &&
+        isCalibrationValid(storedCalibration.hlLr) &&
+        isCalibrationValid(storedCalibration.hrUd) &&
+        isCalibrationValid(storedCalibration.hrLr);
+
+    if (!valid)
+    {
+        Serial.println(
+            "Keine gueltige Kalibrierung im EEPROM gefunden");
+
+        return;
+    }
+
+    calibrationHlUd = storedCalibration.hlUd;
+    calibrationHlLr = storedCalibration.hlLr;
+    calibrationHrUd = storedCalibration.hrUd;
+    calibrationHrLr = storedCalibration.hrLr;
+
+    Serial.println(
+        "Joystick-Kalibrierung aus EEPROM geladen");
+}
+
+uint16_t FunkSteuerung::readAverage(uint8_t pin) const
+{
+    constexpr uint8_t SAMPLE_COUNT = 32;
+    uint32_t sum = 0;
+
+    for (uint8_t i = 0; i < SAMPLE_COUNT; ++i)
+    {
+        sum += analogRead(pin);
+    }
+
+    return static_cast<uint16_t>(sum / SAMPLE_COUNT);
+}
+
+void FunkSteuerung::calibrateJoystickCenters()
+{
+    calibrationHlUd.center = readAverage(PIN_HL_UD);
+    calibrationHlLr.center = 1023 - readAverage(PIN_HL_LR);
+    calibrationHrUd.center = readAverage(PIN_HR_UD);
+    calibrationHrLr.center = readAverage(PIN_HR_LR);
+    saveCalibration();
+}
 
 void FunkSteuerung::updatePaketRate()
 {
@@ -101,10 +177,22 @@ void FunkSteuerung::updatePaketRate()
 
 void FunkSteuerung::funkeAuswerten()
 {
-    data.hl_ud = static_cast<uint16_t>(analogRead(PIN_HL_UD));
-    data.hl_lr = static_cast<uint16_t>(analogRead(PIN_HL_LR));
-    data.hr_ud = static_cast<uint16_t>(analogRead(PIN_HR_UD));
-    data.hr_lr = static_cast<uint16_t>(analogRead(PIN_HR_LR));
+
+    // data.hl_ud = static_cast<uint16_t>(analogRead(PIN_HL_UD));
+    // data.hl_lr = static_cast<uint16_t>(analogRead(PIN_HL_LR));
+    // data.hr_ud = static_cast<uint16_t>(analogRead(PIN_HR_UD));
+    // data.hr_lr = static_cast<uint16_t>(analogRead(PIN_HR_LR));
+
+    const uint16_t rawHlUd = analogRead(PIN_HL_UD);
+    const uint16_t rawHlLr = 1023 - analogRead(PIN_HL_LR);
+    const uint16_t rawHrUd = analogRead(PIN_HR_UD);
+    const uint16_t rawHrLr = analogRead(PIN_HR_LR);
+
+    data.hl_ud = calibrateAxis(rawHlUd, calibrationHlUd);
+    data.hl_lr = calibrateAxis(rawHlLr, calibrationHlLr);
+    data.hr_ud = calibrateAxis(rawHrUd, calibrationHrUd);
+    data.hr_lr = calibrateAxis(rawHrLr, calibrationHrLr);
+
     data.poti = static_cast<uint16_t>(analogRead(PIN_POTI));
     data.fader = static_cast<uint16_t>(analogRead(PIN_FADER));
     data.flap = static_cast<uint16_t>(analogRead(PIN_FLAP));
@@ -190,6 +278,52 @@ bool FunkSteuerung::sendePaket()
     //     Serial.println();
     // }
     return true;
+}
+
+uint16_t FunkSteuerung::normalizeAxisToU16(uint16_t raw, const AxisCalibration &calibration) const
+{
+    if (raw <= calibration.center)
+    {
+        return static_cast<uint16_t>(
+            map(raw,
+                calibration.minValue,
+                calibration.center,
+                0,
+                32768));
+    }
+
+    return static_cast<uint16_t>(
+        map(raw,
+            calibration.center,
+            calibration.maxValue,
+            32768,
+            65535));
+}
+uint16_t FunkSteuerung::calibrateAxis(uint16_t raw, const AxisCalibration &calibration) const
+{
+    int32_t result;
+
+    if (raw <= calibration.center)
+    {
+        result = map(
+            raw,
+            calibration.minValue,
+            calibration.center,
+            0,
+            512);
+    }
+    else
+    {
+        result = map(
+            raw,
+            calibration.center,
+            calibration.maxValue,
+            512,
+            1024);
+    }
+
+    return static_cast<uint16_t>(
+        constrain(result, 0L, 1023L));
 }
 
 bool FunkSteuerung::isChecksumValid(const uint8_t *data, size_t length)

@@ -1,6 +1,29 @@
 // FunkSteuerung.h
 #pragma once
 #include <Arduino.h>
+#include <EEPROM.h>
+
+struct AxisCalibration
+{
+    uint16_t minValue;
+    uint16_t center;
+    uint16_t maxValue;
+
+    AxisCalibration(uint16_t minValue = 512, uint16_t centerValue = 512, uint16_t maxValue = 512)
+        : minValue(minValue), center(centerValue), maxValue(maxValue)
+    {
+    }
+};
+
+struct JoystickCalibration
+{
+    uint16_t magicNumber;
+
+    AxisCalibration hlUd;
+    AxisCalibration hlLr;
+    AxisCalibration hrUd;
+    AxisCalibration hrLr;
+};
 
 // 8bit mask für schalter, taster und sonderTaster
 
@@ -68,21 +91,76 @@ class FunkSteuerung
 {
 public:
     FunkSteuerung(HardwareSerial &serial);
+
     void begin(uint32_t baudrate);
     bool update();
+
+    void loadCalibration();
+    void saveCalibration();
+
     void getSchalterMask(uint8_t &mask) { mask = maskData.schalterMask; }
     void getTasterMask(uint8_t &mask) { mask = maskData.tasterMask; }
     const FunkSteuerungData &getData() const { return data; }
     void resetMaxPacketInterval() { maxPaketInterval = paketInterval; }
     //! test
     // void getSonderTasterMask(uint8_t &mask) { mask = maskData.sonderTasterMask; }
+    uint16_t readAverage(uint8_t pin) const;
     void getMaskData(MaskData &outMaskData) { outMaskData = maskData; }
+
+    void calibrateJoystickCenters();
+    void updateMinMax(AxisCalibration &calibration, uint16_t raw)
+    {
+        calibration.minValue = min(calibration.minValue, raw);
+        calibration.maxValue = max(calibration.maxValue, raw);
+    }
+    const AxisCalibration &getPendingHlUd() const { return pendingHlUd; }
+    const AxisCalibration &getPendingHlLr() const { return pendingHlLr; }
+    const AxisCalibration &getPendingHrUd() const { return pendingHrUd; }
+    const AxisCalibration &getPendingHrLr() const { return pendingHrLr; }
+
+    void beginMinMaxCalibration()
+    {
+
+        const uint16_t hlUd = analogRead(PIN_HL_UD);
+        const uint16_t hlLr = 1023 - analogRead(PIN_HL_LR);
+        const uint16_t hrUd = analogRead(PIN_HR_UD);
+        const uint16_t hrLr = analogRead(PIN_HR_LR);
+
+        pendingHlUd = {hlUd, calibrationHlUd.center, hlUd};
+        pendingHlLr = {hlLr, calibrationHlLr.center, hlLr};
+        pendingHrUd = {hrUd, calibrationHrUd.center, hrUd};
+        pendingHrLr = {hrLr, calibrationHrLr.center, hrLr};
+    }
+    // Removed duplicate calibrateJoystickMinMax function
+    void updateMinMaxCalibration()
+    {
+        updateMinMax(pendingHlUd, analogRead(PIN_HL_UD));
+        updateMinMax(pendingHlLr, 1023 - analogRead(PIN_HL_LR));
+        updateMinMax(pendingHrUd, analogRead(PIN_HR_UD));
+        updateMinMax(pendingHrLr, analogRead(PIN_HR_LR));
+    }
+    void saveMinMaxCalibration()
+    {
+        calibrationHlUd.minValue = pendingHlUd.minValue;
+        calibrationHlUd.maxValue = pendingHlUd.maxValue;
+
+        calibrationHlLr.minValue = pendingHlLr.minValue;
+        calibrationHlLr.maxValue = pendingHlLr.maxValue;
+
+        calibrationHrUd.minValue = pendingHrUd.minValue;
+        calibrationHrUd.maxValue = pendingHrUd.maxValue;
+
+        calibrationHrLr.minValue = pendingHrLr.minValue;
+        calibrationHrLr.maxValue = pendingHrLr.maxValue;
+        saveCalibration();
+    }
 
 private:
     HardwareSerial &port;
     FunkSteuerungData data;
     MaskData maskData;
-
+    static constexpr int EEPROM_CALIBRATION_ADDRESS = 0;
+    static constexpr uint16_t CALIBRATION_MAGIC_NUMBER = 0xCA71;
     static constexpr uint32_t SEND_INTERVAL_MS = 20;
 
     uint32_t lastSendTime = 0;
@@ -107,6 +185,24 @@ private:
         buffer[index] = value & 0xFF;            // Low-Byte
         buffer[index + 1] = (value >> 8) & 0xFF; // High-Byte
     }
+
+    // Joystick Calibration
+    AxisCalibration calibrationHlUd;
+    AxisCalibration calibrationHlLr;
+    AxisCalibration calibrationHrUd;
+    AxisCalibration calibrationHrLr;
+
+    bool isCalibrationValid(const AxisCalibration &calibration) const;
+
+    AxisCalibration pendingHlUd;
+    AxisCalibration pendingHlLr;
+    AxisCalibration pendingHrUd;
+    AxisCalibration pendingHrLr;
+
+    uint16_t normalizeAxisToU16(
+        uint16_t raw,
+        const AxisCalibration &calibration) const;
+    uint16_t calibrateAxis(uint16_t raw, const AxisCalibration &calibration) const;
 
     uint16_t hl_UD = 0;
     uint16_t hr_UD = 2;

@@ -51,7 +51,13 @@ public:
     void drawButtonStates(const FunkSteuerungData &data);
     void drawRadioValues(const FunkSteuerungData &data);
     void drawTimingValues(const FunkSteuerungData &data, const TimingData &timingData);
+
+    void drawCalibrationMenu(uint8_t selectedEntry);
+    void drawCalibrationCenter(const FunkSteuerungData &data);
+    void drawCalibrationMinMax(const FunkSteuerungData &data);
+
     void drawBattery(uint16_t millivolts);
+    void drawSaveConfirmation(const char *message);
 
 private:
     static constexpr uint8_t OLED_CS = 4;
