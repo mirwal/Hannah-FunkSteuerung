@@ -56,8 +56,9 @@ private:
     static constexpr uint32_t SAVE_MESSAGE_DURATION_MS = 1000;
     bool showSaveMessage = false;
     uint32_t saveMessageStart = 0;
-
+    void updateRefreshTiming();
     void handleMenu(const SenderControlEvents &events, uint8_t numEntries);
+    void handleCurrentPage(const SenderControlEvents &events);
 
     // moveSelection is used for both main menu and diagnostics menu
     void moveSelection(int8_t direction, uint8_t numEntries);

@@ -130,12 +130,12 @@ void loop()
   batteryMonitor.update();
   senderControls.update();
 
-  if (senderControls.getEvents().clearPressed)
-  {
-    timingData.maxLoopInterval = timingData.loopInterval;
-    funkSteuerung.resetMaxPacketInterval();
-    Serial.println("Max Loop Interval and Max Packet Interval reset.");
-  }
+  // if (senderControls.getEvents().clearPressed)
+  // {
+  //   timingData.maxLoopInterval = timingData.loopInterval;
+  //   funkSteuerung.resetMaxPacketInterval();
+  //   Serial.println("Max Loop Interval and Max Packet Interval reset.");
+  // }
 
   menu.update(senderControls.getEvents(), funkSteuerung.getData(), timingData);
 

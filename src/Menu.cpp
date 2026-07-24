@@ -1,8 +1,65 @@
 // Menu.cpp
 #include "Menu.h"
+void Menu::updateRefreshTiming()
+{
+    const uint32_t currentTime = millis();
+    // für Speichermeldung refresh pausieren
+    if (showSaveMessage)
+    {
+        if ((currentTime - saveMessageStart) >= SAVE_MESSAGE_DURATION_MS)
+        {
+            return;
+        }
+        showSaveMessage = false;
+        redrawRequired = true;
+    }
 
+    // Für die dynamischen Seiten (Diagnostics und Calibration) wird alle 100 ms ein Refresh durchgeführt
+    const bool isDynamicPage =
+        currentPage == MenuPage::DIAGNOSTICS_ANALOG ||
+        currentPage == MenuPage::DIAGNOSTICS_BUTTONS ||
+        currentPage == MenuPage::DIAGNOSTICS_RADIO ||
+        currentPage == MenuPage::DIAGNOSTICS_TIMING ||
+        currentPage == MenuPage::CALIBRATION_CENTER ||
+        currentPage == MenuPage::CALIBRATION_MIN_MAX;
+
+    if (isDynamicPage && (currentTime - lastDiagnosticsRefresh >= DIAGNOSTICS_REFRESH_MS))
+    {
+        lastDiagnosticsRefresh = currentTime;
+        redrawRequired = true;
+    }
+}
 void Menu::update(const SenderControlEvents &events, const FunkSteuerungData &funkData, const TimingData &timingData)
 {
+    // Handle menu navigation and page updates
+    handleCurrentPage(events);
+
+    // Für Diagnostics und Kalibrierung
+    updateRefreshTiming();
+
+    // Kalibrierungslogik ????????
+
+    // Zeichnen der aktuellen Seite, wenn erforderlich
+    if (redrawRequired)
+    {
+        draw(funkData, timingData);
+        redrawRequired = false;
+    }
+
+    // Navigation: Zurück-Taste
+    if (events.backPressed)
+    {
+        goBack();
+    }
+}
+
+void Menu::handleCurrentPage(const SenderControlEvents &events)
+{
+    // Navigation
+    // Refresh-Timing
+    // Kalibrierung speichern
+    // Kalibrierung aktualisieren
+    // Zeichnen
     switch (currentPage)
     {
     case MenuPage::MAIN:
@@ -17,79 +74,71 @@ void Menu::update(const SenderControlEvents &events, const FunkSteuerungData &fu
         break;
 
     case MenuPage::DIAGNOSTICS_ANALOG:
-    case MenuPage::DIAGNOSTICS_BUTTONS:
-    case MenuPage::DIAGNOSTICS_RADIO:
-    case MenuPage::DIAGNOSTICS_TIMING:
-    case MenuPage::CALIBRATION_CENTER:
-    case MenuPage::CALIBRATION_MIN_MAX:
-    case MenuPage::BATTERY:
+        // nur anzeigen mit refresh alle 100 ms
+        // laufende Messung aktualisieren
+        // dienst nur der Anzeige, die Werte werden im Hintergrund gemessen
+        // updateDiagnosticsAnalogPage(events);
         break;
-    }
-
-    // Dynamische Diagnoseseiten alle 100 ms neu zeichnen
-    if (currentPage == MenuPage::DIAGNOSTICS_ANALOG || currentPage == MenuPage::DIAGNOSTICS_BUTTONS || currentPage == MenuPage::DIAGNOSTICS_RADIO ||
-        currentPage == MenuPage::DIAGNOSTICS_TIMING || currentPage == MenuPage::CALIBRATION_CENTER || currentPage == MenuPage::CALIBRATION_MIN_MAX)
-    {
-        const uint32_t currentTime = millis();
-
-        if (!(showSaveMessage && (currentTime - saveMessageStart < SAVE_MESSAGE_DURATION_MS)) && (currentTime - lastDiagnosticsRefresh >= DIAGNOSTICS_REFRESH_MS))
+    case MenuPage::DIAGNOSTICS_BUTTONS:
+        // nur anzeigen mit refresh alle 100 ms
+        // laufende Messung aktualisieren
+        // dienst nur der Anzeige, die Werte werden im Hintergrund gemessen
+        // updateDiagnosticsButtonsPage(events);
+        break;
+    case MenuPage::DIAGNOSTICS_RADIO:
+        // nur anzeigen mit refresh alle 100 ms
+        // laufende Messung aktualisieren
+        // dienst nur der Anzeige, die Werte werden im Hintergrund gemessen
+        // updateDiagnosticsRadioPage(events);
+        break;
+    case MenuPage::DIAGNOSTICS_TIMING:
+        // nur anzeigen mit refresh alle 100 ms
+        // laufende Messung aktualisieren
+        // dienst nur der Anzeige, die Werte werden im Hintergrund gemessen
+        // updateDiagnosticsTimingPage(events);
+        break;
+    case MenuPage::CALIBRATION_CENTER:
+        // nur anzeigen mit refresh alle 100 ms
+        // laufende Kalibrierung aktualisieren
+        // mit der clear Taste speichern
+        // mit der back Taste eine Ebene zurück ohne speichern
+        // updateCalibrationCenterPage(events);
+        if (events.clearPressed)
         {
-            lastDiagnosticsRefresh = currentTime;
-            redrawRequired = true;
-        }
-    }
-    // Speichern der Kalibrierung, wenn Clear gedrückt wird
-    if (events.clearPressed && (currentPage == MenuPage::CALIBRATION_CENTER || currentPage == MenuPage::CALIBRATION_MIN_MAX))
-    {
-        if (currentPage == MenuPage::CALIBRATION_CENTER)
-        {
-            funkSteuerung.calibrateJoystickCenters();
-            display.drawSaveConfirmation("Mittelpunkt");
+            // funkSteuerung.calibrateJoystickCenters();    // hier müssen die werte nur überschrieben werden, die funksteuerung speichert die werte in der eeprom
+            display.drawSaveConfirmation("Gespeichert"); // das ist nur eine anzeige, die funksteuerung speichert die werte in der eeprom
+            Serial.println("SAVE Calibration: center: ");
+            saveMessageStart = millis() + 1000;
             showSaveMessage = true;
-            saveMessageStart = millis();
+            currentPage = MenuPage::CALIBRATION; // zurück zur Kalibrierungshauptseite, ist erwünscht, da die Kalibrierung abgeschlossen ist
+            return;
+        }
+        break;
+    case MenuPage::CALIBRATION_MIN_MAX:
+        // nur anzeigen mit refresh alle 100 ms
+        // laufende Kalibrierung aktualisieren
+        // mit der clear Taste speichern
+        // mit der back Taste eine Ebene zurück ohne speichern
+        // updateCalibrationMinMaxPage(events);
+        funkSteuerung.updateMinMaxCalibration();
 
+        if (events.clearPressed)
+        {
+            // funkSteuerung.saveMinMaxCalibration();
+            display.drawSaveConfirmation("Gespeichert");
+            Serial.println("SAVE Calibration: min/max: ");
+            saveMessageStart = millis() + 1000;
+            showSaveMessage = true;
+            currentPage = MenuPage::CALIBRATION; // zurück zur Kalibrierungshauptseite, ist erwünscht, da die Kalibrierung abgeschlossen ist
             return;
         }
 
-        if (currentPage == MenuPage::CALIBRATION_MIN_MAX)
-        {
-            funkSteuerung.saveMinMaxCalibration();
-            display.drawSaveConfirmation("Min / Max");
-            Serial.print("SAVE Calibration: HL_UD: ");
-            Serial.print(funkSteuerung.getPendingHlUd().maxValue);
-            Serial.print(", HL_LR: ");
-            Serial.print(funkSteuerung.getPendingHlLr().maxValue);
-            Serial.print(", HR_UD: ");
-            Serial.print(funkSteuerung.getPendingHrUd().maxValue);
-            Serial.print(", HR_LR: ");
-            Serial.println(funkSteuerung.getPendingHrLr().maxValue);
-            showSaveMessage = true;
-            saveMessageStart = millis();
-        }
-    }
-
-    if (currentPage == MenuPage::CALIBRATION_MIN_MAX)
-    {
-        funkSteuerung.updateMinMaxCalibration();
-        Serial.print("Min/Max Calibration: HL_UD: ");
-        Serial.print(funkSteuerung.getPendingHlUd().maxValue);
-        Serial.print(", HL_LR: ");
-        Serial.print(funkSteuerung.getPendingHlLr().maxValue);
-        Serial.print(", HR_UD: ");
-        Serial.print(funkSteuerung.getPendingHrUd().maxValue);
-        Serial.print(", HR_LR: ");
-        Serial.println(funkSteuerung.getPendingHrLr().maxValue);
-    }
-
-    if (redrawRequired)
-    {
-        draw(funkData, timingData);
-        redrawRequired = false;
-    }
-
-    if (events.backPressed)
-    {
-        goBack();
+        break;
+    case MenuPage::BATTERY:
+        // nur anzeigen mit refresh alle 100 ms
+        // ich weiß nicht ob ich hier die logik rein machen soll, oder ob das nur eine anzeige ist
+        // updateBatteryPage(events);
+        break;
     }
 }
 
@@ -177,7 +226,6 @@ void Menu::selectEntry()
 
         case 1:
             Serial.println("Calibration Min/Max selected");
-            funkSteuerung.beginMinMaxCalibration();
             currentPage = MenuPage::CALIBRATION_MIN_MAX;
             break;
         }
@@ -226,12 +274,10 @@ void Menu::draw(const FunkSteuerungData &funkData, const TimingData &timingData)
     case MenuPage::MAIN:
         display.drawMainMenu(selectedEntry);
         break;
-
     case MenuPage::DIAGNOSTICS:
         display.drawDiagnosticsMenu(selectedEntry);
         break;
     case MenuPage::DIAGNOSTICS_ANALOG:
-
         display.drawAnalogValues(funkData);
         break;
     case MenuPage::DIAGNOSTICS_BUTTONS:
@@ -251,12 +297,8 @@ void Menu::draw(const FunkSteuerungData &funkData, const TimingData &timingData)
         break;
     case MenuPage::CALIBRATION_MIN_MAX:
         display.drawCalibrationMinMax(funkData);
-
-        // kann ich hier die logik rein machen ?
-
         break;
     case MenuPage::BATTERY:
-        // display.drawBattery(funkData.batteryMillivolts);
         break;
     }
 }
