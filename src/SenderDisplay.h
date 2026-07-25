@@ -1,9 +1,12 @@
 // SenderDisplay.h
 #pragma once
+#include <U8g2lib.h>
 #include "FunkSteuerung.h"
 #include "TimingData.h"
 #include <Arduino.h>
-#include <U8g2lib.h>
+#include "mirwal_U8X8.h"
+#include "wifi_search_32_32_7f.h"
+#include "BatteryMonitor.h"
 
 // diese ichons und schriften sind in der u8g2 library enthalten und können direkt verwendet werden
 // https://github.com/olikraus/u8g2/wiki/fntlist8?utm_source=chatgpt.com#u8g2-font-list
@@ -17,7 +20,6 @@
 #define Font_Title u8g2_font_6x10_tf
 #define Font_Entry u8g2_font_5x8_mf
 #define SELECTED_ICON "> "
-
 struct SymbolIchon
 {
     const char *alarm = "A";
@@ -41,9 +43,11 @@ public:
     void clear();
     void show();
 
+    void drawHome(const FunkSteuerungData &data, const BatteryData &batteryData);
+    void drawJoystickPositions(const FunkSteuerungData &data);
     void drawTitle(const char *title);
-
     void drawMainMenu(uint8_t selectedEntry);
+    void drawIconEntry(uint8_t row, bool selected);
     void drawMenuEntry(uint8_t row, const char *text, bool selected);
 
     void drawDiagnosticsMenu(uint8_t selectedEntry);
@@ -56,7 +60,9 @@ public:
     void drawCalibrationCenter(const FunkSteuerungData &data);
     void drawCalibrationMinMax(const FunkSteuerungData &data);
 
-    void drawBattery(uint16_t millivolts);
+    uint8_t BatteryZeichenHolen(const BatteryData &batteryData);
+    void drawBattery(const BatteryData &batteryData);
+    void drawAbout();
     void drawSaveConfirmation(const char *message);
 
 private:
